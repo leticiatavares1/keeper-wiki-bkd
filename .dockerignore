@@ -1,0 +1,12 @@
+.git
+.github
+.claude
+.venv
+__pycache__
+*.pyc
+.env
+db
+scripts
+docs
+README.md
+CLAUDE.md

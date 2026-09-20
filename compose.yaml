@@ -1,0 +1,34 @@
+services:
+  # API de leitura: http://127.0.0.1:8000 (docs em /docs)
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Dentro da rede do Docker o banco atende em `db`, não em localhost.
+      # As URLs do .env apontam para localhost porque servem aos scripts do host.
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    networks:
+      - keeper-wiki
+
+  # Desenvolvimento com reload: docker compose --profile dev up dev
+  dev:
+    profiles: [dev]
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - ./app:/app/app:ro
+    networks:
+      - keeper-wiki
+
+networks:
+  # Criada pelo compose do ../keeper-wiki-db. Suba o banco primeiro.
+  keeper-wiki:
+    external: true
