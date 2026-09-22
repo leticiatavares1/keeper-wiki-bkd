@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from .. import consultas
 from ..config import config
 from ..db import busca_muitos, busca_um, busca_valor, pool
-from ..modelos import EstacaoContada, Pagina, Receita, ReceitaResumo
+from ..modelos import EstacaoContada, Pagina, Receita
 
 rotas = APIRouter(tags=["receitas"])
 
@@ -23,13 +23,13 @@ async def lista(
     limite: int = Query(50, ge=1),
     offset: int = Query(0, ge=0),
     banco: asyncpg.Pool = Depends(pool),
-) -> Pagina[ReceitaResumo]:
+) -> Pagina[Receita]:
     limite = min(limite, config.limite_maximo)
     filtros = (busca, origem, estacao, item, incluir_ocultas)
     total = await busca_valor(banco, consultas.CONTA_RECEITAS, *filtros)
     linhas = await busca_muitos(banco, consultas.LISTA_RECEITAS, *filtros, limite, offset)
     return Pagina(total=total, limite=limite, offset=offset,
-                  dados=[ReceitaResumo(**linha) for linha in linhas])
+                  dados=[Receita(**linha) for linha in linhas])
 
 
 @rotas.get("/receitas/{receita_id:path}", summary="Uma receita, com entradas e saídas")

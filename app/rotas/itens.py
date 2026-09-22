@@ -9,14 +9,14 @@ from pydantic import BaseModel
 from .. import consultas
 from ..config import config
 from ..db import busca_muitos, busca_um, busca_valor, pool
-from ..modelos import Item, Pagina, ReceitaResumo
+from ..modelos import Item, Pagina, Receita
 
 rotas = APIRouter(prefix="/itens", tags=["itens"])
 
 
 class ReceitasDoItem(BaseModel):
-    produzem: list[ReceitaResumo]
-    consomem: list[ReceitaResumo]
+    produzem: list[Receita]
+    consomem: list[Receita]
 
 
 @rotas.get("", summary="Lista itens, com busca sem acento por nome pt/en/id")
@@ -44,13 +44,18 @@ async def detalhe(item_id: str, banco: asyncpg.Pool = Depends(pool)) -> Item:
     return Item(**linha)
 
 
+async def receitas_dos_ids(banco: asyncpg.Pool, ids: list[str]) -> ReceitasDoItem:
+    """Receitas que produzem e que consomem qualquer um dos ids."""
+    produzem = await busca_muitos(banco, consultas.RECEITAS_DO_ITEM, ids, "saida")
+    consomem = await busca_muitos(banco, consultas.RECEITAS_DO_ITEM, ids, "entrada")
+    return ReceitasDoItem(
+        produzem=[Receita(**linha) for linha in produzem],
+        consomem=[Receita(**linha) for linha in consomem],
+    )
+
+
 @rotas.get("/{item_id}/receitas", summary="Receitas que produzem e que consomem o item")
 async def receitas(item_id: str, banco: asyncpg.Pool = Depends(pool)) -> ReceitasDoItem:
-    if not await busca_valor(banco, "SELECT 1 FROM gk.item WHERE id = $1", item_id):
+    if not await busca_valor(banco, consultas.ITEM_EXISTE, item_id):
         raise HTTPException(404, f"item '{item_id}' não existe")
-    produzem = await busca_muitos(banco, consultas.RECEITAS_DO_ITEM, item_id, "saida")
-    consomem = await busca_muitos(banco, consultas.RECEITAS_DO_ITEM, item_id, "entrada")
-    return ReceitasDoItem(
-        produzem=[ReceitaResumo(**linha) for linha in produzem],
-        consomem=[ReceitaResumo(**linha) for linha in consomem],
-    )
+    return await receitas_dos_ids(banco, [item_id])

@@ -22,6 +22,9 @@ class Config(BaseSettings):
     # Teto do `limite` das listagens.
     limite_maximo: int = 500
 
+    # Pasta dos PNGs dos ícones (volume somente leitura, ver compose.yaml).
+    icones_dir: str = "/icones"
+
     titulo: str = "Keeper Wiki API"
     raiz: str = ""
 

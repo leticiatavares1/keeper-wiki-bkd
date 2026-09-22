@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Carrega o dado extraído do jogo no Postgres.
 
-    ./scripts/importa.py [--wiki ../reveng-graveyard-keeper/out/data/wiki]
+    ./scripts/importa.py [--wiki ../reveng-graveyard-keeper/out/gk1/data/wiki]
 
 Lê `itens.json`, `receitas.json` e `tecnologias.json` produzidos pelo
 `catalogo.py` do ../reveng-graveyard-keeper (a extração vive lá, não aqui) e
@@ -24,7 +24,7 @@ from pathlib import Path
 import asyncpg
 
 RAIZ = Path(__file__).resolve().parent.parent
-PADRAO_WIKI = RAIZ.parent / "reveng-graveyard-keeper" / "out" / "data" / "wiki"
+PADRAO_WIKI = RAIZ.parent / "reveng-graveyard-keeper" / "out" / "gk1" / "data" / "wiki"
 
 
 def texto(valor) -> str | None:
@@ -69,6 +69,12 @@ def linhas_item(itens: list[dict]):
             bool(it.get("tem_durabilidade")),
             bool(it.get("nao_usado")),
             list(it.get("tipos_de_produto") or []),
+            texto(it.get("icone")),
+            int(it["estrela"]) if it.get("estrela") is not None else None,
+            texto(it.get("grupo")),
+            bool(it.get("pode_usar")),
+            json.dumps(it.get("ao_usar") or {}),
+            list(it.get("ao_usar_expr") or []),
         )
 
 
@@ -181,6 +187,7 @@ async def principal(pasta: Path, url: str) -> None:
                 "id", "pt", "en", "descricao_pt", "descricao_en", "tipo",
                 "preco_base", "qualidade", "pilha", "eficiencia",
                 "tem_durabilidade", "nao_usado", "tipos_de_produto",
+                "icone", "estrela", "grupo", "pode_usar", "ao_usar", "ao_usar_expr",
             ], linhas_item(itens))
 
             await copia("gk.receita", [
@@ -226,7 +233,7 @@ async def principal(pasta: Path, url: str) -> None:
 if __name__ == "__main__":
     argumentos = argparse.ArgumentParser(description=__doc__)
     argumentos.add_argument("--wiki", type=Path, default=PADRAO_WIKI,
-                            help="pasta out/data/wiki do reveng-graveyard-keeper")
+                            help="pasta out/gk1/data/wiki do reveng-graveyard-keeper")
     opcoes = argumentos.parse_args()
 
     url = os.environ.get("DATABASE_URL_DONO")

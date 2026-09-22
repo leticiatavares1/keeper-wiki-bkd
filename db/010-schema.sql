@@ -41,11 +41,28 @@ CREATE TABLE IF NOT EXISTS gk.item (
   tem_durabilidade boolean NOT NULL,
   nao_usado        boolean NOT NULL,
   tipos_de_produto text[]  NOT NULL DEFAULT '{}',
+  icone            text,
+  estrela          smallint,
+  grupo            text,
+  pode_usar        boolean NOT NULL DEFAULT false,
+  ao_usar          jsonb   NOT NULL DEFAULT '{}',
+  ao_usar_expr     text[]  NOT NULL DEFAULT '{}',
   busca text GENERATED ALWAYS AS (
     gk.normaliza(coalesce(pt, '') || ' ' || coalesce(en, '') || ' ' || id)
   ) STORED
 );
 COMMENT ON COLUMN gk.item.pt IS 'Tradução oficial pt-BR do binário; NULL quando o item não tem entrada na localização.';
+-- Bancos criados antes desses campos: CREATE TABLE IF NOT EXISTS não os adiciona.
+ALTER TABLE gk.item ADD COLUMN IF NOT EXISTS icone        text;
+ALTER TABLE gk.item ADD COLUMN IF NOT EXISTS estrela      smallint;
+ALTER TABLE gk.item ADD COLUMN IF NOT EXISTS grupo        text;
+ALTER TABLE gk.item ADD COLUMN IF NOT EXISTS pode_usar    boolean NOT NULL DEFAULT false;
+ALTER TABLE gk.item ADD COLUMN IF NOT EXISTS ao_usar      jsonb   NOT NULL DEFAULT '{}';
+ALTER TABLE gk.item ADD COLUMN IF NOT EXISTS ao_usar_expr text[]  NOT NULL DEFAULT '{}';
+COMMENT ON COLUMN gk.item.icone IS 'Nome do sprite (sem .png); o PNG é servido por GET /icones/{nome}.png.';
+COMMENT ON COLUMN gk.item.estrela IS '1, 2 ou 3 (bronze, prata, ouro). NULL em item sem nível de qualidade.';
+COMMENT ON COLUMN gk.item.grupo IS 'Id do grupo de níveis ("pumpkin_crop" para "pumpkin_crop:2"). Não é id de item.';
+COMMENT ON COLUMN gk.item.ao_usar IS 'Efeito de usar o item, por recurso; negativo é perda. Em ferramenta (pode_usar false) é o custo por golpe.';
 COMMENT ON COLUMN gk.item.nao_usado IS 'Item existe no balanceamento mas não aparece no jogo. Filtre fora por padrão.';
 
 -- ── Receitas ─────────────────────────────────────────────────────────────────
@@ -141,6 +158,7 @@ CREATE TABLE IF NOT EXISTS gk.tecnologia_perk (
 
 -- ── Índices ──────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS item_busca_trgm      ON gk.item      USING gin (busca gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS item_grupo           ON gk.item (grupo);
 CREATE INDEX IF NOT EXISTS item_tipo            ON gk.item (tipo);
 CREATE INDEX IF NOT EXISTS tecnologia_busca_trgm ON gk.tecnologia USING gin (busca gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS tecnologia_ramo      ON gk.tecnologia (ramo_n);
@@ -157,3 +175,15 @@ CREATE OR REPLACE VIEW gk.estacao AS
          count(DISTINCT receita_id)::integer AS receitas
     FROM gk.receita_estacao
    GROUP BY estacao_id;
+
+-- Item com níveis de qualidade é um item só: "Abóbora" (pumpkin_crop) reúne
+-- pumpkin_crop:1/2/3. Nome, ícone e tipo saem do nível de menor estrela.
+CREATE OR REPLACE VIEW gk.grupo AS
+  SELECT DISTINCT ON (grupo)
+         grupo AS id, pt, en, icone, tipo,
+         bool_and(nao_usado) OVER (PARTITION BY grupo) AS nao_usado,
+         (count(*) OVER (PARTITION BY grupo))::integer AS niveis,
+         busca
+    FROM gk.item
+   WHERE grupo IS NOT NULL
+   ORDER BY grupo, estrela NULLS LAST, id;

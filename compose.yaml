@@ -8,6 +8,8 @@ services:
       # Dentro da rede do Docker o banco atende em `db`, não em localhost.
       # As URLs do .env apontam para localhost porque servem aos scripts do host.
       DATABASE_URL: ${DATABASE_URL_DOCKER}
+    volumes:
+      - ../reveng-graveyard-keeper/out/gk1/icones:/icones:ro
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     networks:
@@ -25,6 +27,7 @@ services:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     volumes:
       - ./app:/app/app:ro
+      - ../reveng-graveyard-keeper/out/gk1/icones:/icones:ro
     networks:
       - keeper-wiki
 

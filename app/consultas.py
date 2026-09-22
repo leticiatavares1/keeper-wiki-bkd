@@ -7,19 +7,26 @@ string, nem os filtros opcionais, que são resolvidos com `$n IS NULL OR ...`.
 # Ingredientes e estações viram JSON no próprio Postgres: uma ida ao banco por
 # requisição, sem N+1. O LEFT JOIN em gk.item existe porque nem toda referência
 # de receita é item (estação, ponto de fé, b_empty:1) — daí o campo `e_item`.
+# Referência a grupo de níveis (gk.grupo) não é item: e_item false, e_grupo true.
 INGREDIENTES = """
   SELECT i.receita_id, i.papel,
          jsonb_agg(jsonb_build_object(
            'ref_id',   i.ref_id,
-           'pt',       coalesce(it.pt, i.ref_pt),
-           'en',       coalesce(it.en, i.ref_en),
+           'pt',       coalesce(it.pt, gr.pt, i.ref_pt),
+           'en',       coalesce(it.en, gr.en, i.ref_en),
            'qtd',      i.qtd,
            'qtd_max',  i.qtd_max,
            'qtd_expr', i.qtd_expr,
-           'e_item',   it.id IS NOT NULL
+           'e_item',   it.id IS NOT NULL,
+           -- ponta que pede o grupo ("pumpkin_crop"), não um nível dele
+           'e_grupo',  gr.id IS NOT NULL,
+           'grupo',    it.grupo,
+           'icone',    coalesce(it.icone, gr.icone),
+           'estrela',  it.estrela
          ) ORDER BY i.ordem) AS lista
     FROM gk.receita_ingrediente i
-    LEFT JOIN gk.item it ON it.id = i.ref_id
+    LEFT JOIN gk.item  it ON it.id = i.ref_id
+    LEFT JOIN gk.grupo gr ON gr.id = i.ref_id AND it.id IS NULL
    GROUP BY i.receita_id, i.papel
 """
 
@@ -80,8 +87,8 @@ _FILTRO_RECEITA = """
 """
 
 LISTA_RECEITAS = f"""
-  SELECT {_COLUNAS_RESUMO}
-    {_JUNCOES_RESUMO}
+  SELECT {_COLUNAS_COMPLETAS}
+    {_JUNCOES_COMPLETAS}
     {_FILTRO_RECEITA}
    ORDER BY r.id
    LIMIT $6 OFFSET $7
@@ -102,7 +109,8 @@ _RELEVANCIA = """
 
 _COLUNAS_ITEM = """
     id, pt, en, descricao_pt, descricao_en, tipo, preco_base, qualidade,
-    pilha, eficiencia, tem_durabilidade, nao_usado, tipos_de_produto
+    pilha, eficiencia, tem_durabilidade, nao_usado, tipos_de_produto,
+    icone, estrela, grupo, pode_usar, ao_usar, ao_usar_expr
 """
 
 # $1 busca, $2 tipo, $3 incluir não usados, $4 limite, $5 offset.
@@ -123,14 +131,41 @@ CONTA_ITENS = f"SELECT count(*) FROM gk.item {_FILTRO_ITEM}"
 
 ITEM_POR_ID = f"SELECT {_COLUNAS_ITEM} FROM gk.item WHERE id = $1"
 
-# Receitas que produzem ($2 = 'saida') ou consomem ($2 = 'entrada') o item $1.
+ITEM_EXISTE = "SELECT 1 FROM gk.item WHERE id = $1"
+
+# Receitas que produzem ($2 = 'saida') ou consomem ($2 = 'entrada') algum dos
+# ids em $1: um item, ou o grupo e todos os seus níveis.
 RECEITAS_DO_ITEM = f"""
-  SELECT {_COLUNAS_RESUMO}
-    {_JUNCOES_RESUMO}
+  SELECT {_COLUNAS_COMPLETAS}
+    {_JUNCOES_COMPLETAS}
    WHERE EXISTS (
            SELECT 1 FROM gk.receita_ingrediente x
-            WHERE x.receita_id = r.id AND x.ref_id = $1 AND x.papel = $2::gk.papel_ingrediente)
+            WHERE x.receita_id = r.id AND x.ref_id = ANY($1::text[])
+              AND x.papel = $2::gk.papel_ingrediente)
    ORDER BY r.id
+"""
+
+# ── Grupos de níveis de qualidade ────────────────────────────────────────────
+# $1 incluir não usados, $2 limite, $3 offset.
+LISTA_GRUPOS = """
+  SELECT id, pt, en, icone, tipo, nao_usado, niveis FROM gk.grupo
+   WHERE ($1::boolean OR NOT nao_usado)
+   ORDER BY coalesce(pt, en, id), id
+   LIMIT $2 OFFSET $3
+"""
+
+CONTA_GRUPOS = "SELECT count(*) FROM gk.grupo WHERE ($1::boolean OR NOT nao_usado)"
+
+GRUPO_POR_ID = "SELECT id, pt, en, icone, tipo, nao_usado, niveis FROM gk.grupo WHERE id = $1"
+
+GRUPO_EXISTE = "SELECT 1 FROM gk.grupo WHERE id = $1"
+
+IDS_DO_GRUPO = "SELECT id FROM gk.item WHERE grupo = $1"
+
+# Níveis do grupo $1, do mais baixo ao mais alto.
+NIVEIS_DO_GRUPO = f"""
+  SELECT {_COLUNAS_ITEM} FROM gk.item WHERE grupo = $1
+   ORDER BY estrela NULLS LAST, id
 """
 
 LISTA_ESTACOES = """
@@ -142,10 +177,25 @@ LISTA_ESTACOES = """
 
 _COLUNAS_TECNOLOGIA = """
     t.id, t.pt, t.en, t.ramo_n, t.ramo_pt, t.custo, t.oculta, t.requer_dlc,
-    coalesce((SELECT array_agg(q.requer_id ORDER BY q.requer_id)
-                FROM gk.tecnologia_requisito q WHERE q.tecnologia_id = t.id), '{}') AS requer,
-    coalesce((SELECT array_agg(c.receita_id ORDER BY c.receita_id)
-                FROM gk.tecnologia_receita c WHERE c.tecnologia_id = t.id), '{}') AS libera_receitas,
+    coalesce((SELECT jsonb_agg(jsonb_build_object('id', q.requer_id, 'pt', rq.pt, 'en', rq.en)
+                              ORDER BY q.requer_id)
+                FROM gk.tecnologia_requisito q
+                LEFT JOIN gk.tecnologia rq ON rq.id = q.requer_id
+               WHERE q.tecnologia_id = t.id), '[]'::jsonb) AS requer,
+    -- A receita não tem nome próprio: usa o do primeiro item que ela produz.
+    -- `existe` é falso nas receitas que o binário cita e a lista não tem.
+    coalesce((SELECT jsonb_agg(jsonb_build_object(
+                       'id', c.receita_id, 'pt', nm.pt, 'en', nm.en,
+                       'existe', rc.id IS NOT NULL) ORDER BY c.receita_id)
+                FROM gk.tecnologia_receita c
+                LEFT JOIN gk.receita rc ON rc.id = c.receita_id
+                LEFT JOIN LATERAL (
+                  SELECT coalesce(si.pt, s.ref_pt) AS pt, coalesce(si.en, s.ref_en) AS en
+                    FROM gk.receita_ingrediente s
+                    LEFT JOIN gk.item si ON si.id = s.ref_id
+                   WHERE s.receita_id = c.receita_id AND s.papel = 'saida'
+                   ORDER BY s.ordem LIMIT 1) nm ON true
+               WHERE c.tecnologia_id = t.id), '[]'::jsonb) AS libera_receitas,
     coalesce((SELECT array_agg(p.perk_id ORDER BY p.perk_id)
                 FROM gk.tecnologia_perk p WHERE p.tecnologia_id = t.id), '{}') AS libera_perks
 """

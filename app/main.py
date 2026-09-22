@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import config
 from .db import abre_pool
-from .rotas import itens, receitas, saude, tecnologias
+from .rotas import grupos, icones, itens, receitas, saude, tecnologias
 
 DESCRICAO = """
 Dado do **Graveyard Keeper** tirado do binário do jogo
@@ -46,6 +46,8 @@ if config.cors_origens:
     )
 
 app.include_router(saude.rotas)
+app.include_router(icones.rotas)
+app.include_router(grupos.rotas)
 app.include_router(itens.rotas)
 app.include_router(receitas.rotas)
 app.include_router(tecnologias.rotas)

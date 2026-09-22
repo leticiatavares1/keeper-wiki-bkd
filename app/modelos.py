@@ -31,6 +31,33 @@ class Item(BaseModel):
     tem_durabilidade: bool
     nao_usado: bool
     tipos_de_produto: list[str]
+    #: Nome do sprite; o PNG sai de GET /icones/{icone}.png.
+    icone: str | None = None
+    #: 1, 2 ou 3 (bronze, prata, ouro).
+    estrela: int | None = None
+    #: Id do grupo de níveis, quando o item é um nível de qualidade.
+    grupo: str | None = None
+    pode_usar: bool = False
+    #: Efeito de usar, por recurso; negativo é perda.
+    ao_usar: dict[str, float] = {}
+    ao_usar_expr: list[str] = []
+
+
+class Grupo(BaseModel):
+    """Item com níveis de qualidade. Nome, ícone e tipo vêm do nível mais baixo."""
+
+    id: str
+    pt: str | None
+    en: str | None
+    icone: str | None
+    tipo: str | None
+    nao_usado: bool
+    niveis: int
+
+
+class GrupoDetalhe(Grupo):
+    #: Os níveis, do mais baixo ao mais alto.
+    itens: list[Item]
 
 
 class Ingrediente(BaseModel):
@@ -42,6 +69,11 @@ class Ingrediente(BaseModel):
     qtd_expr: str | None = None
     #: Falso quando a referência não é item (estação, ponto de fé, b_empty:1).
     e_item: bool
+    #: Verdadeiro quando a ponta pede o grupo de níveis (ref_id = id do grupo).
+    e_grupo: bool = False
+    grupo: str | None = None
+    icone: str | None = None
+    estrela: int | None = None
 
 
 class Estacao(BaseModel):
@@ -73,13 +105,24 @@ class Receita(ReceitaResumo):
     precisa_desbloquear: bool
     perks: list[str]
     liberada_por: list[str]
-    pontos_tecnologia: dict[str, float]
+    pontos_tecnologia: dict[str, float | None]
     acao: str | None
     objeto_id: str | None
     objeto_pt: str | None
     objeto_en: str | None
     entradas: list[Ingrediente]
     entradas_da_estacao: list[Ingrediente]
+
+
+class TecRef(BaseModel):
+    id: str
+    pt: str | None
+    en: str | None
+
+
+class TecReceita(TecRef):
+    #: Falso quando o binário aponta para uma receita que não está na lista.
+    existe: bool
 
 
 class Tecnologia(BaseModel):
@@ -91,8 +134,8 @@ class Tecnologia(BaseModel):
     custo: dict[str, float]
     oculta: bool
     requer_dlc: int
-    requer: list[str]
-    libera_receitas: list[str]
+    requer: list[TecRef]
+    libera_receitas: list[TecReceita]
     libera_perks: list[str]
 
 
