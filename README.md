@@ -42,14 +42,21 @@ docker compose logs -f api
 |---|---|
 | `GET /saude` | a API responde e o banco está acessível |
 | `GET /meta` | de qual extração veio o dado que está no ar |
-| `GET /itens` | lista com busca sem acento (`busca`, `tipo`, `incluir_nao_usados`) |
+| `GET /icones` | nomes dos sprites (`{total, dados}`, sem paginação) |
+| `GET /icones/{nome}.png` | o PNG do sprite (`image/png`, cache público; 404 se não existir) |
+| `GET /itens` | lista (com `icone`, `estrela`, `grupo`, `pode_usar`, `ao_usar`) com busca sem acento (`busca`, `tipo`, `incluir_nao_usados`) |
 | `GET /itens/{id}` | um item |
-| `GET /itens/{id}/receitas` | receitas que produzem e que consomem o item |
+| `GET /itens/{id}/receitas` | receitas (completas) que produzem e que consomem o item |
+| `GET /grupos` | itens com níveis de qualidade, um por grupo (`incluir_nao_usados`) |
+| `GET /grupos/{id}` | o grupo com os níveis (`itens`), do mais baixo ao mais alto |
+| `GET /grupos/{id}/receitas` | `{produzem, consomem}` do grupo e de todos os seus níveis |
 | `GET /receitas` | lista (`busca`, `origem`, `estacao`, `item`, `incluir_ocultas`) |
 | `GET /receitas/{id}` | receita com entradas, saídas e estações |
 | `GET /estacoes` | estações de trabalho e quantas receitas cada uma tem |
 | `GET /tecnologias` | árvore de pesquisa (`busca`, `ramo`) |
 | `GET /tecnologias/{id}` | uma tecnologia |
+
+Os ícones são arquivos, não banco: vêm de `../reveng-graveyard-keeper/out/gk1/icones/`, montada em `/icones` (somente leitura) pelo `compose.yaml`; `ICONES_DIR` muda o caminho.
 
 As listagens devolvem `{total, limite, offset, dados}`. `limite` vai até 500.
 
@@ -83,7 +90,7 @@ Quando o jogo for atualizado e o `reveng-graveyard-keeper` reextrair:
 
 ```sh
 set -a; source .env; set +a
-./.venv/bin/python scripts/importa.py            # --wiki aponta outra pasta
+./.venv/bin/python scripts/importa.py            # --wiki aponta outra pasta; o padrão é `out/gk1/data/wiki`
 ```
 
 A carga é uma transação só: ou entra tudo, ou o banco fica como estava. Cada
