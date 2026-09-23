@@ -17,7 +17,11 @@ rotas = APIRouter(prefix="/tecnologias", tags=["tecnologias"])
 async def lista(
     busca: str | None = Query(None),
     ramo: int | None = Query(None, description="número do ramo (gk.tecnologia.ramo_n)"),
-    incluir_ocultas: bool = Query(False),
+    # `oculta` na tecnologia é "começa escondida" (hidden/invisible no
+    # TechDefinition), não "interna": o jogo revela essas tecnologias durante a
+    # partida (GameSave.RevealHiddenTech, Flow_RevealTech) — "Iron" é uma delas,
+    # e quase todas as de DLC também. Por isso o padrão é trazê-las.
+    incluir_ocultas: bool = Query(True, description="false esconde as que começam escondidas"),
     dlc: FiltroDlc | None = Query(None, description="id da DLC, ou 'base' para o que não é de DLC"),
     limite: int = Query(50, ge=1),
     offset: int = Query(0, ge=0),
