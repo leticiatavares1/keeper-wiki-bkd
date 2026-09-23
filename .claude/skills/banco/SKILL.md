@@ -89,6 +89,21 @@ algumas têm linha em `gk.item`.
   é bug para consertar aqui — confira antes de dizer que uma tecnologia libera
   uma receita.
 
+### `gk.dlc` e `gk.dlc_de`
+
+`gk.dlc` são as quatro DLCs (`n`, `id`, `nome`). `gk.dlc_de` (visão
+materializada: `tipo`, `id`, `dlc`) diz de qual DLC é cada `tecnologia`,
+`receita`, `estacao`, `item` e `grupo`. Só tem as linhas de DLC — sem linha é
+jogo base, então é `LEFT JOIN`. É **dedução**, não campo do jogo: a regra está
+em `db/015-dlc.sql` e no README. O único dado de DLC que veio do binário é
+`gk.tecnologia.requer_dlc`.
+
+```sql
+select i.id, i.pt, d.dlc from gk.item i
+  left join gk.dlc_de d on d.tipo = 'item' and d.id = i.id
+ where d.dlc = 'game_of_crone' and not i.nao_usado;
+```
+
 ### `gk.importacao`
 
 Uma linha por rodada do `importa.py`. A mais recente diz de onde veio o dado
