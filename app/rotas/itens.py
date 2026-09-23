@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from .. import consultas
 from ..config import config
 from ..db import busca_muitos, busca_um, busca_valor, pool
-from ..modelos import Item, Pagina, Receita
+from ..modelos import FiltroDlc, Item, Pagina, Receita
 
 rotas = APIRouter(prefix="/itens", tags=["itens"])
 
@@ -24,12 +24,13 @@ async def lista(
     busca: str | None = Query(None, description="nome em português, em inglês ou id"),
     tipo: str | None = Query(None, description="valor de gk.item.tipo"),
     incluir_nao_usados: bool = Query(False, description="traz itens que o jogo não usa"),
+    dlc: FiltroDlc | None = Query(None, description="id da DLC, ou 'base' para o que não é de DLC"),
     limite: int = Query(50, ge=1),
     offset: int = Query(0, ge=0),
     banco: asyncpg.Pool = Depends(pool),
 ) -> Pagina[Item]:
     limite = min(limite, config.limite_maximo)
-    filtros = (busca, tipo, incluir_nao_usados)
+    filtros = (busca, tipo, incluir_nao_usados, dlc)
     total = await busca_valor(banco, consultas.CONTA_ITENS, *filtros)
     linhas = await busca_muitos(banco, consultas.LISTA_ITENS, *filtros, limite, offset)
     return Pagina(total=total, limite=limite, offset=offset,

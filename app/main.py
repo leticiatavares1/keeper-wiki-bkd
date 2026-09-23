@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import config
 from .db import abre_pool
-from .rotas import grupos, icones, itens, receitas, saude, tecnologias
+from .rotas import dlcs, grupos, icones, itens, receitas, saude, tecnologias
 
 DESCRICAO = """
 Dado do **Graveyard Keeper** tirado do binário do jogo
@@ -51,3 +51,4 @@ app.include_router(grupos.rotas)
 app.include_router(itens.rotas)
 app.include_router(receitas.rotas)
 app.include_router(tecnologias.rotas)
+app.include_router(dlcs.rotas)

@@ -224,6 +224,13 @@ async def principal(pasta: Path, url: str) -> None:
             await copia("gk.tecnologia_perk", ["tecnologia_id", "perk_id"],
                         linhas_ligacao(tecnologias, "libera_perks"))
 
+            # A DLC de cada coisa é deduzida do que acabou de entrar (regra em
+            # db/015-dlc.sql). Na mesma transação: não existe janela em que o
+            # dado novo esteja no ar com a DLC calculada sobre o velho.
+            await conexao.execute("REFRESH MATERIALIZED VIEW gk.dlc_de")
+            n_dlc = await conexao.fetch(
+                "SELECT tipo, count(*) AS n FROM gk.dlc_de GROUP BY tipo ORDER BY tipo")
+
             await conexao.execute(
                 """INSERT INTO gk.importacao
                        (build_do_jogo, fonte, itens, receitas, tecnologias)
@@ -232,6 +239,7 @@ async def principal(pasta: Path, url: str) -> None:
                 len(itens), len(receitas), len(tecnologias),
             )
         print(f"gravado: {n_ing} ingredientes, {n_est} vínculos de estação")
+        print("de DLC: " + ", ".join(f"{linha['n']} {linha['tipo']}" for linha in n_dlc))
         await conexao.execute("ANALYZE")
     finally:
         await conexao.close()

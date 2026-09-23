@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel
 
 T = TypeVar("T")
+
+#: Id de DLC, como o campo `dlc` vem. NULL (None) é jogo base.
+IdDlc = Literal["breaking_dead", "stranger_sins", "game_of_crone", "better_save_soul"]
+#: Valor aceito no filtro `?dlc=` das listagens: uma DLC ou "base" (dlc NULL).
+FiltroDlc = Literal["breaking_dead", "stranger_sins", "game_of_crone", "better_save_soul", "base"]
 
 
 class Pagina(BaseModel, Generic[T]):
@@ -41,6 +46,8 @@ class Item(BaseModel):
     #: Efeito de usar, por recurso; negativo é perda.
     ao_usar: dict[str, float] = {}
     ao_usar_expr: list[str] = []
+    #: DLC deduzida (db/015-dlc.sql); None é jogo base.
+    dlc: IdDlc | None = None
 
 
 class Grupo(BaseModel):
@@ -53,6 +60,8 @@ class Grupo(BaseModel):
     tipo: str | None
     nao_usado: bool
     niveis: int
+    #: DLC quando todos os níveis são dela; None é jogo base.
+    dlc: IdDlc | None = None
 
 
 class GrupoDetalhe(Grupo):
@@ -83,6 +92,8 @@ class Estacao(BaseModel):
     #: Sprite da estação (objeto de mundo), com o fallback do próprio jogo por
     #: interaction_type — não é só custom_icon. 169 dos 228 ids têm sprite.
     icone: str | None = None
+    #: DLC deduzida (db/015-dlc.sql); None é jogo base.
+    dlc: IdDlc | None = None
 
 
 class EstacaoContada(Estacao):
@@ -94,6 +105,8 @@ class ReceitaResumo(BaseModel):
     origem: str
     tipo: str
     oculta: bool
+    #: DLC deduzida (db/015-dlc.sql); None é jogo base.
+    dlc: IdDlc | None = None
     estacoes: list[Estacao]
     saidas: list[Ingrediente]
 
@@ -140,10 +153,25 @@ class Tecnologia(BaseModel):
     ramo_icone: str
     custo: dict[str, float]
     oculta: bool
+    #: O campo do jogo (TechDefinition.requires_dlc), como veio: 0, 1 ou 3.
     requer_dlc: int
+    #: DLC deduzida: requer_dlc, e senão a árvore (db/015-dlc.sql). None é jogo base.
+    dlc: IdDlc | None = None
     requer: list[TecRef]
     libera_receitas: list[TecReceita]
     libera_perks: list[str]
+
+
+class Dlc(BaseModel):
+    id: IdDlc
+    #: Valor no enum do jogo (DLCEngine.DLCVersion).
+    n: int
+    #: Nome do produto; a localização pt-br do jogo também usa o nome em inglês.
+    nome: str
+    tecnologias: int
+    receitas: int
+    estacoes: int
+    itens: int
 
 
 class Importacao(BaseModel):

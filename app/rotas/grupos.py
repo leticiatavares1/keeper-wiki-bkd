@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from .. import consultas
 from ..config import config
 from ..db import busca_muitos, busca_um, busca_valor, pool
-from ..modelos import Grupo, GrupoDetalhe, Item, Pagina
+from ..modelos import FiltroDlc, Grupo, GrupoDetalhe, Item, Pagina
 from .itens import ReceitasDoItem, receitas_dos_ids
 
 rotas = APIRouter(prefix="/grupos", tags=["grupos"])
@@ -17,13 +17,15 @@ rotas = APIRouter(prefix="/grupos", tags=["grupos"])
 @rotas.get("", summary="Lista os itens que têm níveis de qualidade")
 async def lista(
     incluir_nao_usados: bool = Query(False, description="traz grupos que o jogo não usa"),
+    dlc: FiltroDlc | None = Query(None, description="id da DLC, ou 'base' para o que não é de DLC"),
     limite: int = Query(50, ge=1),
     offset: int = Query(0, ge=0),
     banco: asyncpg.Pool = Depends(pool),
 ) -> Pagina[Grupo]:
     limite = min(limite, config.limite_maximo)
-    total = await busca_valor(banco, consultas.CONTA_GRUPOS, incluir_nao_usados)
-    linhas = await busca_muitos(banco, consultas.LISTA_GRUPOS, incluir_nao_usados, limite, offset)
+    filtros = (incluir_nao_usados, dlc)
+    total = await busca_valor(banco, consultas.CONTA_GRUPOS, *filtros)
+    linhas = await busca_muitos(banco, consultas.LISTA_GRUPOS, *filtros, limite, offset)
     return Pagina(total=total, limite=limite, offset=offset,
                   dados=[Grupo(**linha) for linha in linhas])
 
