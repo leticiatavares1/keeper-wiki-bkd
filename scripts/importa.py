@@ -100,6 +100,7 @@ def linhas_receita(receitas: list[dict]):
             texto(objeto.get("id")),
             texto(objeto.get("pt")),
             texto(objeto.get("en")),
+            texto(objeto.get("icone")),
         )
 
 
@@ -130,7 +131,10 @@ def linhas_ingrediente(receitas: list[dict]):
 def linhas_estacao(receitas: list[dict]):
     for r in receitas:
         for ordem, est in enumerate(r.get("estacoes") or []):
-            yield (r["id"], ordem, est["id"], texto(est.get("pt")), texto(est.get("en")))
+            yield (
+                r["id"], ordem, est["id"], texto(est.get("pt")), texto(est.get("en")),
+                texto(est.get("icone")),
+            )
 
 
 def linhas_tecnologia(tecnologias: list[dict]):
@@ -142,6 +146,7 @@ def linhas_tecnologia(tecnologias: list[dict]):
             texto(t.get("en")),
             int(ramo["n"]) if ramo.get("n") is not None else None,
             texto(ramo.get("pt")),
+            texto(ramo.get("icone")) or "",
             json.dumps(t.get("custo") or {}),
             bool(t.get("oculta")),
             int(t.get("requer_dlc") or 0),
@@ -195,6 +200,7 @@ async def principal(pasta: Path, url: str) -> None:
                 "energia_expr", "sanidade", "dificuldade", "oculta",
                 "precisa_desbloquear", "perks", "liberada_por",
                 "pontos_tecnologia", "acao", "objeto_id", "objeto_pt", "objeto_en",
+                "objeto_icone",
             ], linhas_receita(receitas))
 
             n_ing = await copia("gk.receita_ingrediente", [
@@ -203,11 +209,12 @@ async def principal(pasta: Path, url: str) -> None:
             ], linhas_ingrediente(receitas))
 
             n_est = await copia("gk.receita_estacao", [
-                "receita_id", "ordem", "estacao_id", "estacao_pt", "estacao_en",
+                "receita_id", "ordem", "estacao_id", "estacao_pt", "estacao_en", "icone",
             ], linhas_estacao(receitas))
 
             await copia("gk.tecnologia", [
-                "id", "pt", "en", "ramo_n", "ramo_pt", "custo", "oculta", "requer_dlc",
+                "id", "pt", "en", "ramo_n", "ramo_pt", "ramo_icone", "custo", "oculta",
+                "requer_dlc",
             ], linhas_tecnologia(tecnologias))
 
             await copia("gk.tecnologia_requisito", ["tecnologia_id", "requer_id"],

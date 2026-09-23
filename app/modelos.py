@@ -80,6 +80,9 @@ class Estacao(BaseModel):
     id: str
     pt: str | None
     en: str | None
+    #: Sprite da estação (objeto de mundo), com o fallback do próprio jogo por
+    #: interaction_type — não é só custom_icon. 169 dos 228 ids têm sprite.
+    icone: str | None = None
 
 
 class EstacaoContada(Estacao):
@@ -110,6 +113,8 @@ class Receita(ReceitaResumo):
     objeto_id: str | None
     objeto_pt: str | None
     objeto_en: str | None
+    #: Sprite do objeto de construção (mesmo padrão de Item.icone).
+    objeto_icone: str | None = None
     entradas: list[Ingrediente]
     entradas_da_estacao: list[Ingrediente]
 
@@ -131,6 +136,8 @@ class Tecnologia(BaseModel):
     en: str | None
     ramo_n: int | None
     ramo_pt: str | None
+    #: Sprite fixo do ramo ("i_tbranch_" + ramo_n). Sempre preenchido.
+    ramo_icone: str
     custo: dict[str, float]
     oculta: bool
     requer_dlc: int

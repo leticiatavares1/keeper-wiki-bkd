@@ -87,9 +87,13 @@ CREATE TABLE IF NOT EXISTS gk.receita (
   acao                text,
   objeto_id           text,
   objeto_pt           text,
-  objeto_en           text
+  objeto_en           text,
+  objeto_icone        text
 );
+-- Bancos criados antes desse campo: CREATE TABLE IF NOT EXISTS não o adiciona.
+ALTER TABLE gk.receita ADD COLUMN IF NOT EXISTS objeto_icone text;
 COMMENT ON COLUMN gk.receita.pontos_tecnologia IS 'Pontos rendidos ao fabricar, por cor: g (verde), b (azul), r (vermelho).';
+COMMENT ON COLUMN gk.receita.objeto_icone IS 'Sprite do objeto de construção (mesmo padrão de gk.item.icone). NULL em receita de craft e em parte das de construção.';
 
 DO $$ BEGIN
   CREATE TYPE gk.papel_ingrediente AS ENUM ('entrada', 'entrada_estacao', 'saida');
@@ -117,8 +121,12 @@ CREATE TABLE IF NOT EXISTS gk.receita_estacao (
   estacao_id text     NOT NULL,
   estacao_pt text,
   estacao_en text,
+  icone      text,
   PRIMARY KEY (receita_id, ordem)
 );
+-- Bancos criados antes desse campo: CREATE TABLE IF NOT EXISTS não o adiciona.
+ALTER TABLE gk.receita_estacao ADD COLUMN IF NOT EXISTS icone text;
+COMMENT ON COLUMN gk.receita_estacao.icone IS 'Sprite da estação (objeto de mundo), nessa linha de receita. NULL em parte delas: 169 dos 228 ids de estação têm sprite (fallback por interaction_type, não só custom_icon).';
 
 -- ── Tecnologias ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS gk.tecnologia (
@@ -127,6 +135,7 @@ CREATE TABLE IF NOT EXISTS gk.tecnologia (
   en         text,
   ramo_n     integer,
   ramo_pt    text,
+  ramo_icone text    NOT NULL DEFAULT '',
   custo      jsonb   NOT NULL DEFAULT '{}',
   oculta     boolean NOT NULL,
   requer_dlc integer NOT NULL DEFAULT 0,
@@ -134,6 +143,9 @@ CREATE TABLE IF NOT EXISTS gk.tecnologia (
     gk.normaliza(coalesce(pt, '') || ' ' || coalesce(en, '') || ' ' || id)
   ) STORED
 );
+-- Bancos criados antes desse campo: CREATE TABLE IF NOT EXISTS não o adiciona.
+ALTER TABLE gk.tecnologia ADD COLUMN IF NOT EXISTS ramo_icone text NOT NULL DEFAULT '';
+COMMENT ON COLUMN gk.tecnologia.ramo_icone IS 'Sprite fixo do ramo ("i_tbranch_" + ramo_n). Sempre preenchido, mesmo valor para toda tecnologia do ramo.';
 
 -- requer_id e receita_id ficam sem FK: 165 das receitas liberadas por
 -- tecnologia não existem na lista de receitas. Guardar o dado como veio do
@@ -168,11 +180,14 @@ CREATE INDEX IF NOT EXISTS estacao_ref          ON gk.receita_estacao (estacao_i
 
 -- ── Visões ───────────────────────────────────────────────────────────────────
 -- Estações não são itens, então a lista sai das próprias receitas.
+-- CREATE OR REPLACE VIEW não deixa inserir coluna no meio de uma view que já
+-- existe (só no fim), daí "icone" vir depois de "receitas" aqui.
 CREATE OR REPLACE VIEW gk.estacao AS
   SELECT estacao_id AS id,
          min(estacao_pt) AS pt,
          min(estacao_en) AS en,
-         count(DISTINCT receita_id)::integer AS receitas
+         count(DISTINCT receita_id)::integer AS receitas,
+         min(icone) AS icone
     FROM gk.receita_estacao
    GROUP BY estacao_id;
 

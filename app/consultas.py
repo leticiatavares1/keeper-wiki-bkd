@@ -33,7 +33,7 @@ INGREDIENTES = """
 ESTACOES = """
   SELECT e.receita_id,
          jsonb_agg(jsonb_build_object(
-           'id', e.estacao_id, 'pt', e.estacao_pt, 'en', e.estacao_en
+           'id', e.estacao_id, 'pt', e.estacao_pt, 'en', e.estacao_en, 'icone', e.icone
          ) ORDER BY e.ordem) AS lista
     FROM gk.receita_estacao e
    GROUP BY e.receita_id
@@ -49,6 +49,7 @@ _COLUNAS_COMPLETAS = _COLUNAS_RESUMO + """,
     r.tempo_s, r.tempo_expr, r.energia, r.energia_expr, r.sanidade,
     r.dificuldade, r.precisa_desbloquear, r.perks, r.liberada_por,
     r.pontos_tecnologia, r.acao, r.objeto_id, r.objeto_pt, r.objeto_en,
+    r.objeto_icone,
     coalesce(ent.lista, '[]'::jsonb) AS entradas,
     coalesce(ees.lista, '[]'::jsonb) AS entradas_da_estacao
 """
@@ -169,14 +170,15 @@ NIVEIS_DO_GRUPO = f"""
 """
 
 LISTA_ESTACOES = """
-  SELECT e.id, coalesce(e.pt, i.pt) AS pt, coalesce(e.en, i.en) AS en, e.receitas
+  SELECT e.id, coalesce(e.pt, i.pt) AS pt, coalesce(e.en, i.en) AS en,
+         coalesce(e.icone, i.icone) AS icone, e.receitas
     FROM gk.estacao e
     LEFT JOIN gk.item i ON i.id = e.id
    ORDER BY coalesce(e.pt, i.pt, e.id)
 """
 
 _COLUNAS_TECNOLOGIA = """
-    t.id, t.pt, t.en, t.ramo_n, t.ramo_pt, t.custo, t.oculta, t.requer_dlc,
+    t.id, t.pt, t.en, t.ramo_n, t.ramo_pt, t.ramo_icone, t.custo, t.oculta, t.requer_dlc,
     coalesce((SELECT jsonb_agg(jsonb_build_object('id', q.requer_id, 'pt', rq.pt, 'en', rq.en)
                               ORDER BY q.requer_id)
                 FROM gk.tecnologia_requisito q
